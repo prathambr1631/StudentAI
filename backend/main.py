@@ -41,10 +41,7 @@ model = joblib.load(MODEL_PATH)
 
 app = FastAPI(
     title="StudentAI Prediction API",
-    description=(
-        "Machine learning API for predicting "
-        "student academic performance."
-    ),
+    description="Machine learning API for predicting student academic performance.",
     version="1.0.0",
 )
 
@@ -53,29 +50,28 @@ app = FastAPI(
 # CORS
 # ==========================================
 
-# Production frontend URL can later be supplied
-# through the FRONTEND_URL environment variable.
-
-frontend_url = os.getenv("FRONTEND_URL")
+frontend_url = os.getenv(
+    "FRONTEND_URL",
+    "https://studentai-emj.onrender.com"
+)
 
 allowed_origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "https://studentai-emj.onrender.com",
 ]
 
+# Add Render environment variable if different
 if frontend_url:
-    allowed_origins.append(
-        frontend_url.rstrip("/")
-    )
+    cleaned_url = frontend_url.rstrip("/")
+
+    if cleaned_url not in allowed_origins:
+        allowed_origins.append(cleaned_url)
 
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "https://studentai-emj.onrender.com",
-    ],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -87,30 +83,12 @@ app.add_middleware(
 # ==========================================
 
 class StudentData(BaseModel):
+    G1: float = Field(ge=0, le=20)
+    G2: float = Field(ge=0, le=20)
 
-    G1: float = Field(
-        ge=0,
-        le=20
-    )
-
-    G2: float = Field(
-        ge=0,
-        le=20
-    )
-
-    studytime: int = Field(
-        ge=1,
-        le=4
-    )
-
-    failures: int = Field(
-        ge=0,
-        le=4
-    )
-
-    absences: int = Field(
-        ge=0
-    )
+    studytime: int = Field(ge=1, le=4)
+    failures: int = Field(ge=0, le=4)
+    absences: int = Field(ge=0)
 
 
 # ==========================================
@@ -119,11 +97,11 @@ class StudentData(BaseModel):
 
 @app.get("/")
 def home():
-
     return {
         "message": "StudentAI API is running",
         "model": "Linear Regression",
-        "version": "1.0.0",
+        "version": "1.0.1",
+        "cors_origins": allowed_origins,
     }
 
 
@@ -133,7 +111,6 @@ def home():
 
 @app.get("/health")
 def health():
-
     return {
         "status": "healthy",
         "model_loaded": True,
@@ -199,12 +176,7 @@ def predict(data: StudentData):
 
         feature_contributions = []
 
-
-        for (
-            feature,
-            value,
-            coefficient
-        ) in zip(
+        for feature, value, coefficient in zip(
             feature_names,
             feature_values,
             coefficients
@@ -218,23 +190,15 @@ def predict(data: StudentData):
             feature_contributions.append(
                 {
                     "feature": feature,
-
-                    "value":
-                        float(value),
-
-                    "coefficient":
-                        round(
-                            float(
-                                coefficient
-                            ),
-                            4
-                        ),
-
-                    "contribution":
-                        round(
-                            contribution,
-                            4
-                        ),
+                    "value": float(value),
+                    "coefficient": round(
+                        float(coefficient),
+                        4
+                    ),
+                    "contribution": round(
+                        contribution,
+                        4
+                    ),
                 }
             )
 
@@ -266,15 +230,12 @@ def predict(data: StudentData):
         # ==================================
 
         if percentage >= 75:
-
             risk_level = "Low"
 
         elif percentage >= 50:
-
             risk_level = "Medium"
 
         else:
-
             risk_level = "High"
 
 
@@ -283,24 +244,19 @@ def predict(data: StudentData):
         # ==================================
 
         return {
+            "predicted_grade": round(
+                prediction,
+                2
+            ),
 
-            "predicted_grade":
-                round(
-                    prediction,
-                    2
-                ),
+            "predicted_percentage": round(
+                percentage,
+                2
+            ),
 
-            "predicted_percentage":
-                round(
-                    percentage,
-                    2
-                ),
+            "risk_level": risk_level,
 
-            "risk_level":
-                risk_level,
-
-            "explanation":
-                feature_contributions,
+            "explanation": feature_contributions,
         }
 
 
