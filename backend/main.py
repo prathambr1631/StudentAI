@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 
 import joblib
 import pandas as pd
@@ -40,7 +41,10 @@ model = joblib.load(MODEL_PATH)
 
 app = FastAPI(
     title="StudentAI Prediction API",
-    description="ML API for predicting student performance",
+    description=(
+        "Machine learning API for predicting "
+        "student academic performance."
+    ),
     version="1.0.0",
 )
 
@@ -49,12 +53,25 @@ app = FastAPI(
 # CORS
 # ==========================================
 
+# Production frontend URL can later be supplied
+# through the FRONTEND_URL environment variable.
+
+frontend_url = os.getenv("FRONTEND_URL")
+
+allowed_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
+if frontend_url:
+    allowed_origins.append(
+        frontend_url.rstrip("/")
+    )
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -66,12 +83,30 @@ app.add_middleware(
 # ==========================================
 
 class StudentData(BaseModel):
-    G1: float = Field(ge=0, le=20)
-    G2: float = Field(ge=0, le=20)
 
-    studytime: int = Field(ge=1, le=4)
-    failures: int = Field(ge=0, le=4)
-    absences: int = Field(ge=0)
+    G1: float = Field(
+        ge=0,
+        le=20
+    )
+
+    G2: float = Field(
+        ge=0,
+        le=20
+    )
+
+    studytime: int = Field(
+        ge=1,
+        le=4
+    )
+
+    failures: int = Field(
+        ge=0,
+        le=4
+    )
+
+    absences: int = Field(
+        ge=0
+    )
 
 
 # ==========================================
@@ -80,9 +115,11 @@ class StudentData(BaseModel):
 
 @app.get("/")
 def home():
+
     return {
         "message": "StudentAI API is running",
         "model": "Linear Regression",
+        "version": "1.0.0",
     }
 
 
@@ -92,6 +129,7 @@ def home():
 
 @app.get("/health")
 def health():
+
     return {
         "status": "healthy",
         "model_loaded": True,
@@ -107,6 +145,10 @@ def predict(data: StudentData):
 
     try:
 
+        # ==================================
+        # INPUT DATA
+        # ==================================
+
         input_data = pd.DataFrame(
             [
                 {
@@ -119,11 +161,19 @@ def predict(data: StudentData):
             ]
         )
 
-        prediction = model.predict(input_data)[0]
 
-        # ==========================================
+        # ==================================
+        # ML PREDICTION
+        # ==================================
+
+        raw_prediction = model.predict(
+            input_data
+        )[0]
+
+
+        # ==================================
         # MODEL EXPLAINABILITY
-        # ==========================================
+        # ==================================
 
         feature_names = [
             "G1",
@@ -145,62 +195,108 @@ def predict(data: StudentData):
 
         feature_contributions = []
 
-        for feature, value, coefficient in zip(
+
+        for (
+            feature,
+            value,
+            coefficient
+        ) in zip(
             feature_names,
             feature_values,
             coefficients
         ):
+
             contribution = (
-                float(value) *
-                float(coefficient)
+                float(value)
+                * float(coefficient)
             )
 
-            feature_contributions.append({
-                "feature": feature,
-                "value": float(value),
-                "coefficient": round(
-                    float(coefficient),
-                    4
-                ),
-                "contribution": round(
-                    contribution,
-                    4
-                ),
-            })
+            feature_contributions.append(
+                {
+                    "feature": feature,
 
-        # Keep prediction inside dataset range
+                    "value":
+                        float(value),
+
+                    "coefficient":
+                        round(
+                            float(
+                                coefficient
+                            ),
+                            4
+                        ),
+
+                    "contribution":
+                        round(
+                            contribution,
+                            4
+                        ),
+                }
+            )
+
+
+        # ==================================
+        # SAFE PREDICTION RANGE
+        # ==================================
+
         prediction = max(
             0,
-            min(20, float(prediction))
+            min(
+                20,
+                float(raw_prediction)
+            )
         )
+
+
+        # ==================================
+        # PERCENTAGE
+        # ==================================
 
         percentage = (
             prediction / 20
         ) * 100
 
-        # Simple application-level risk interpretation
+
+        # ==================================
+        # RISK CLASSIFICATION
+        # ==================================
+
         if percentage >= 75:
+
             risk_level = "Low"
 
         elif percentage >= 50:
+
             risk_level = "Medium"
 
         else:
+
             risk_level = "High"
 
+
+        # ==================================
+        # RESPONSE
+        # ==================================
+
         return {
-            "predicted_grade": round(
-                prediction,
-                2
-            ),
 
-            "predicted_percentage": round(
-                percentage,
-                2
-            ),
+            "predicted_grade":
+                round(
+                    prediction,
+                    2
+                ),
 
-            "risk_level": risk_level,
-            "explanation": feature_contributions
+            "predicted_percentage":
+                round(
+                    percentage,
+                    2
+                ),
+
+            "risk_level":
+                risk_level,
+
+            "explanation":
+                feature_contributions,
         }
 
 
