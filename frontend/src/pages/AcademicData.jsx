@@ -11,6 +11,10 @@ import {
 import { auth, db } from "../firebase/firebase";
 import { useNavigate } from "react-router-dom";
 
+const API_URL =
+  import.meta.env.VITE_API_URL ||
+  "http://127.0.0.1:8000";
+
 function AcademicData() {
   const navigate = useNavigate();
 
@@ -114,7 +118,7 @@ function AcademicData() {
 
       // Send student data to FastAPI
       const response = await fetch(
-        "http://127.0.0.1:8000/predict",
+         `${API_URL}/predict`,
         {
           method: "POST",
 
