@@ -13,7 +13,7 @@ The project combines **Machine Learning, React, Firebase, FastAPI, and cloud dep
 ### Frontend
 StudentAI Web Application:
 
-[https://studentai-emj.onrender.com](https://studentai-iemj.onrender.com/)
+https://studentai-iemj.onrender.com
 
 ### Backend API
 FastAPI ML API:
